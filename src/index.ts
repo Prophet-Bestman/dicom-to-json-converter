@@ -1,5 +1,6 @@
 import fs from "fs";
 import dicomParser from "dicom-parser";
+import { TAG_DICT } from "./tagDictionary.js";
 
 function readDicomSeries(folderPath) {
   const fileNames = fs.readdirSync(folderPath);
@@ -8,6 +9,14 @@ function readDicomSeries(folderPath) {
   fileNames.forEach((fileName) => {
     const filePath = `${folderPath}/${fileName}`;
     const fileContent = fs.readFileSync(filePath);
+
+    function getTag(tag) {
+      var group = tag.substring(1, 5);
+      var element = tag.substring(5, 9);
+      var tagIndex = ("(" + group + "," + element + ")").toUpperCase();
+      var attr = TAG_DICT[tagIndex];
+      return attr;
+    }
 
     try {
       // Parse DICOM file
@@ -19,7 +28,49 @@ function readDicomSeries(folderPath) {
       };
 
       var instance = dicomParser.explicitDataSetToJS(dataSet, options);
-      series.push(instance);
+
+      function formatNestedObjects(instance) {
+        var formattedInstance = {};
+
+        function formatItem(item) {
+          var itemFormatted = {};
+          for (var itemTag in item) {
+            if (item.hasOwnProperty(itemTag)) {
+              var itemTagAttr = getTag(itemTag);
+              if (itemTagAttr) {
+                var itemTagValue = item[itemTag];
+                if (itemTagAttr.vr == "SQ") {
+                  // Recursively format nested sequences
+                  itemTagValue = itemTagValue.map(formatItem);
+                }
+                itemFormatted[itemTagAttr.name] = itemTagValue;
+              }
+            }
+          }
+          return itemFormatted;
+        }
+
+        for (var tag in instance) {
+          if (instance.hasOwnProperty(tag)) {
+            var tagAttr = getTag(tag);
+            if (tagAttr) {
+              var tagValue = instance[tag];
+              if (tagAttr.vr == "SQ") {
+                // Recursively format nested sequences
+                tagValue = tagValue.map(formatItem);
+              }
+              formattedInstance[tagAttr.name] = tagValue;
+            }
+          }
+        }
+
+        return formattedInstance;
+      }
+
+      // Usage
+      var formattedInstance = formatNestedObjects(instance);
+
+      series.push(formattedInstance);
     } catch (error) {
       console.error(`Error parsing DICOM file ${fileName}: ${error.message}`);
     }
