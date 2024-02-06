@@ -50,6 +50,16 @@ function readDicomSeries(filePath) {
           var tagAttr = getTag(tag);
           if (tagAttr) {
             var tagValue = instance[tag];
+
+            if (typeof tagValue === "string" && tagValue.includes("\\")) {
+              var tagArray = tagValue.split("\\");
+
+              // @ts-ignore
+              tagArray = tagArray.map(String);
+
+              tagValue = tagArray;
+            }
+
             if (tagAttr.vr == "SQ") {
               // Recursively format nested sequences
               tagValue = tagValue.map(formatItem);
@@ -62,7 +72,6 @@ function readDicomSeries(filePath) {
       return formattedInstance;
     }
 
-    // Usage
     var formattedInstance = formatNestedObjects(instance);
 
     return formattedInstance;
@@ -71,7 +80,7 @@ function readDicomSeries(filePath) {
   }
 }
 
-const dicomSeries = readDicomSeries("public/series-000001/image-000001.dcm");
+const dicomSeries = readDicomSeries("public/series-000001/image-000030.dcm");
 
 const jsonResult = JSON.stringify(dicomSeries, null, 2);
 
